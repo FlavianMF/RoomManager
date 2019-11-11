@@ -1,83 +1,92 @@
+#include <ArduinoJson.h>
+#include <PubSubClient.h>
 #include <WiFi.h>
-#include <WiFiUdp.h>
 
 #define ssid "FABLAB"
 #define pass "F@bl@b2017"
 
+const String ORG = "20qyjr";
+const String DEVICE_TYPE = "Esp";
+const String DEVICE_ID = "0001";
+#define DEVICE_TOKEN "sp24-iV(jAgHekMO-Y"
+
 #define ledOnBoard 2
 
-WiFiUDP udpServer;
+#define COMMAND_TOPIC_ROOMLIGHT "iot-2/cmd/roomLight/fmt/json"
 
-String _buffer = "";
+const String CLIENT_ID = "d:" + ORG + ":" + DEVICE_TYPE + ":" + DEVICE_ID;
+
+const String MQTT_SERVER = ORG + ".messaging.internetofthings.ibmcloud.com";
+
+bool stateLight = false;
+
+WiFiClient wifiClient;
+PubSubClient client(MQTT_SERVER.c_str(), 1883, wifiClient);
 
 void setup() {
+    // put your setup code here, to run once:
     Serial.begin(115200);
+    Serial.println("Setup Init");
+
     pinMode(ledOnBoard, OUTPUT);
+    connectWiFi();
+    delay(2000);
 
-    WiFi.mode(WIFI_STA);
-    if (WiFi.begin(ssid, pass)) {
-        Serial.println("Connected");
-        Serial.println(WiFi.softAPIP());
-    }
-
-    udpServer.begin(554);
+    connectMQTTServer();
+    Serial.println("Setup Finish");
 }
 
 void loop() {
-    // tcpManager();
-    listen();
+    // put your main code here, to run repeatedly:
+    client.loop();
 }
 
-// void tcpManager(){
-//     if(client.connected()){
-//         if(client.available() > 0){
-//             _buffer = "";
-//             while(client.available() > 0){
-//                 char z = client.read();
-//                 _buffer += z;
-//             }
-
-//             Serial.print("\nUm cliente enviou uma mensagem");
-//             Serial.print("\n...IP do cliente: ");
-//             Serial.print(client.remoteIP());
-//             Serial.print("\n...IP do servidor: ");
-//             Serial.print(WiFi.softAPIP());
-//             Serial.print("\n...Mensagem do cliente: " + _buffer + "\n");
-
-//             client.print("\nO servidor recebeu sua mensagem");
-//             client.print("\n...Seu IP: ");
-//             client.print(client.remoteIP());
-//             client.print("\n...IP do Servidor: ");
-//             client.print(WiFi.softAPIP());
-//             client.print("\n...Sua mensagem: " + _buffer + "\n");
-//         }
-//     }else{
-//         client = server.available();
-//         delay(1);
-//     }
-// }
-
-void listen()  // Sub-rotina que verifica se há pacotes UDP's para serem lidos.
-{
-    if (udpServer.parsePacket() > 0)  // Se houver pacotes para serem lidos
-    {
-        _buffer = "";  // Reseta a string para receber uma nova informaçao
-        while (udpServer.available() >
-               0)  // Enquanto houver dados para serem lidos
-        {
-            char z = udpServer.read();  // Adiciona o byte lido em uma char
-            _buffer += z;               // Adiciona o char à string
-        }
-
-        // Após todos os dados serem lidos, a String estara pronta.
-
-        Serial.println(_buffer);  // Printa a string recebida no Serial monitor.
-
-        digitalWrite(ledOnBoard, 0);  //-
-        delay(5);                     //-
-        digitalWrite(ledOnBoard,
-                     1);  // Pisca o LED rapidamente apos receber a string.
-        delay(5);
-        digitalWrite(ledOnBoard, 0);
+void connectMQTTServer() {
+    Serial.println("Connecting to MQTT Server...");
+    // Se conecta com as credenciais obtidas no site do Watson IoT
+    // quando cadastramos um novo device
+    if (client.connect(CLIENT_ID.c_str(), "use-token-auth", DEVICE_TOKEN)) {
+        // Se a conexão foi bem sucedida
+        Serial.println("Connected to MQTT Broker");
+        // Quando algo for postado em algum tópico que estamos inscritos
+        // a função "callback" será executada
+        client.setCallback(callback);
+        // Se inscreve nos tópicos de interesse
+        client.subscribe(COMMAND_TOPIC_ROOMLIGHT);
+        digitalWrite(ledOnBoard, HIGH);
+    } else {
+        // Se ocorreu algum erro
+        Serial.print("error = ");
+        Serial.println(client.state());
+        connectMQTTServer();  // tenta conectar novamente
     }
+}
+
+void callback(char* topic, unsigned char* payload, unsigned int length) {
+    Serial.print("topic: ");
+    Serial.println(topic);
+
+    StaticJsonDocument<30> jsonBuffer;
+
+    DeserializationError error = deserializeJson(jsonBuffer, payload);
+
+    if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.c_str());
+        return;
+    }
+
+    String value = jsonBuffer["command"];
+    if (strcmp(topic, COMMAND_TOPIC_ROOMLIGHT) == 0) {
+        digitalWrite(ledOnBoard, stateLight);
+        stateLight = !stateLight;
+    }
+}
+
+void connectWiFi() {
+    WiFi.mode(WIFI_STA);
+    if (!WiFi.begin(ssid, pass)) {
+        Serial.println("Wifi Not Cennected");
+    }
+    Serial.println("Wifi Connected");
 }
