@@ -7,6 +7,7 @@
 // const char* ssid = "CHUPA TROIA";
 // const char* pass = "omega2019";
 
+
 void OTAon() {
     if (!stateOTA) {
         stateOTA = true;
@@ -35,7 +36,7 @@ void finishOTA() {
     Serial.println("finishing OTA");
     OTA = false;
     // ArduinoOTA.end();
-    finishWifi();
+    // finishWifi();
     Serial.println("OTA finished");
 }
 

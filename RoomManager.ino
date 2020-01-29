@@ -1,12 +1,15 @@
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
-#include <WiFi.h>
-// #include <ESP8266WiFi.h>
-// #include <ESP8266mDNS.h>
+// #include <WiFi.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 
-#define ssid "FABLAB"
-#define pass "F@bl@b2017"
+// #define ssid "FABLAB"
+// #define pass "F@bl@b2017"
+
+#define ssid "COWORKING"
+#define pass "coworking2018"
 
 // #define ssid "NEW HOUSE"
 // #define pass "E22C4156"
@@ -17,10 +20,13 @@ const String DEVICE_ID = "0001";
 #define DEVICE_TOKEN "sp24-iV(jAgHekMO-Y"
 
 #define ledOnBoard 2
-#define relayPin 0
+#define relay1Pin 1
+#define relay2Pin 3
 
 #define COMMAND_TOPIC_ROOMLIGHT "iot-2/cmd/roomLight/fmt/json"
 #define COMMAND_TOPIC_LOADING "iot-2/cmd/loading/fmt/json"
+#define COMMAND_TOPIC_OTA_ON "iot-2/cmd/OTA_ON/fmt/json"
+#define COMMAND_TOPIC_OTA_OFF "iot-2/cmd/OTA_OFF/fmt/json"
 
 #define COMMAND_EVENT_LOADING "iot-2/evt/loading/fmt/json"
 #define COMMAND_EVENT_CONFIRM "iot-2/evt/confirm/fmt/json"
@@ -43,7 +49,8 @@ void setup() {
     Serial.println("Setup Init");
 
     pinMode(ledOnBoard, OUTPUT);
-    pinMode(relayPin, OUTPUT);
+    pinMode(relay1Pin, OUTPUT);
+    pinMode(relay2Pin, OUTPUT);
 
     connectWiFi();
     delay(2000);
@@ -81,6 +88,8 @@ void connectMQTTServer() {
         // Se inscreve nos tópicos de interesse
         client.subscribe(COMMAND_TOPIC_ROOMLIGHT);
         client.subscribe(COMMAND_TOPIC_LOADING);
+        client.subscribe(COMMAND_TOPIC_OTA_ON);
+        client.subscribe(COMMAND_TOPIC_OTA_OFF);
         digitalWrite(ledOnBoard, HIGH);
     } else {
         // Se ocorreu algum erro
@@ -110,8 +119,8 @@ void callback(char* topic, unsigned char* payload, unsigned int length) {
     jsonBuffer.remove("command");
     if (strcmp(topic, COMMAND_TOPIC_ROOMLIGHT) == 0) {
         stateLight = !stateLight;
-        digitalWrite(ledOnBoard, stateLight);
-        digitalWrite(relayPin, stateLight);
+        digitalWrite(relay1Pin, stateLight);
+        digitalWrite(relay2Pin, stateLight);
         if (stateLight) {
             jsonBuffer["_id"] = "MainDatabase";
             jsonBuffer["status"]["roomLight"] = "on";
@@ -122,14 +131,24 @@ void callback(char* topic, unsigned char* payload, unsigned int length) {
         serializeJson(jsonBuffer, _buffer);
         Serial.println(_buffer);
         client.publish(COMMAND_EVENT_CONFIRM, (char*)_buffer.c_str());
-    }
-
-    if (strcmp(topic, COMMAND_TOPIC_LOADING) == 0) {
+    }else if (strcmp(topic, COMMAND_TOPIC_LOADING) == 0) {
         jsonBuffer["roomLight"] = stateLight;
         // jsonBuffer["loading"] = stateLoading;
         serializeJson(jsonBuffer, _buffer);
         Serial.println(_buffer);
         client.publish(COMMAND_EVENT_LOADING, (char*)_buffer.c_str());
+    }else if(strcmp(topic, COMMAND_TOPIC_OTA_ON) == 0){
+        OTA = true;
+        jsonBuffer["OTA"] = OTA;
+        serializeJson(jsonBuffer, _buffer);
+        Serial.println(_buffer);
+        client.publish(COMMAND_EVENT_CONFIRM, (char*)_buffer.c_str());
+    }else if(strcmp(topic, COMMAND_TOPIC_OTA_OFF) == 0){
+        finishOTA();
+        jsonBuffer["OTA"] = OTA;
+        serializeJson(jsonBuffer, _buffer);
+        Serial.println(_buffer);
+        client.publish(COMMAND_EVENT_CONFIRM, (char*)_buffer.c_str());
     }
 }
 
