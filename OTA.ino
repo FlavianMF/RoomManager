@@ -12,6 +12,7 @@ void OTAon() {
     if (!stateOTA) {
         stateOTA = true;
         enableOTA();
+        OTA = true;
     } else {
         ArduinoOTA.handle();
     }
@@ -19,25 +20,29 @@ void OTAon() {
 
 void enableOTA() {
     Serial.println("starting OTA");
+    blinkLedStatus(2, false);
     setupWifi();
     Serial.print("IP adress: ");
     Serial.println(WiFi.localIP());
     ArduinoOTA.setHostname("stRoomManager");
-    // ArduinoOTA.setPassword("shiryuFlv");
     ArduinoOTA.onStart(startOTA);
-    ArduinoOTA.onEnd(endOTA);
+        ArduinoOTA.onEnd(endOTA);
     ArduinoOTA.onProgress(progressOTA);
     ArduinoOTA.onError(errorOTA);
     ArduinoOTA.begin();
+    OTA = true;
     Serial.println("OTA started");
+    blinkLedStatus(2, true);
 }
 
 void finishOTA() {
     Serial.println("finishing OTA");
+    blinkLedStatus(2, false);
     OTA = false;
     // ArduinoOTA.end();
     // finishWifi();
     Serial.println("OTA finished");
+    blinkLedStatus(2, true);
 }
 
 void setupWifi() {
